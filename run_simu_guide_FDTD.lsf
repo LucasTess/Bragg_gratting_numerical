@@ -1,0 +1,95 @@
+# run_simu_guide_FDTD.lsf 
+
+groupscope("::model");
+select("FDTD"); 
+delete;
+select("mesh_grating"); # Limpa a malha customizada anterior, se existir
+delete;
+
+# ======================================================================
+# 1. OBTENÇÃO DOS PARÂMETROS DA GEOMETRIA
+# ======================================================================
+height   = getnamed("Guia Bragg", "height");
+Lambda   = getnamed("Guia Bragg", "Lambda");
+w        = getnamed("Guia Bragg", "w");
+L_target = getnamed("Guia Bragg", "L_target");
+
+# Recalculando dimensões reais baseadas na geometria do script anterior
+N = round(L_target / Lambda);
+L_actual = N * Lambda;
+
+sim_time = 10000e-15; # 10 ps: Tempo para a luz percorrer os 200 um (ida e volta)
+points = 500;
+mesh_accuracy = 2; # A precisão base pode ficar em 2, pois teremos a malha forçada na grade
+
+# ======================================================================
+# 2. CONFIGURAÇÃO DA REGIÃO FDTD (3D)
+# ======================================================================
+addfdtd;
+set("dimension", "3D"); 
+set("x min", -L_actual/2 - 1.5e-6);
+set("x max", L_actual/2 + 1.5e-6);
+set("y", 0);
+set("y span", w + 2e-6); 
+set("z", 0);
+set("z span", height + 1.5e-6);
+
+set("background material", 'SiO2 (Glass) - Palik');
+set("mesh accuracy", mesh_accuracy);
+set("auto shutoff min", 1e-5); 
+
+# ======================================================================
+# 3. MALHA DE PRECISÃO (CRÍTICO PARA LER A APODIZAÇÃO)
+# ======================================================================
+# Força resolução de 10nm na região da grade para não perder os dentes
+addmesh;
+set("name", "mesh_grating");
+set("x", 0); 
+set("x span", L_actual);
+set("y", 0); 
+set("y span", w * 1.2);
+set("z", 0); 
+set("z span", height * 1.5);
+set("dx", 10e-9); 
+set("dy", 10e-9);
+
+# ======================================================================
+# 4. CONFIGURAÇÃO DE PORTAS (REGIME ESTREITAMENTE MONOMODO)
+# ======================================================================
+# Porta 1: Injeta TE0 e Mede Reflexão TE0
+addport;
+set("name", "port_1");
+set("injection axis", "x-axis");
+set("direction", "Forward");
+set("x", -L_actual/2 - 0.5e-6);
+set("y", 0); 
+set("y span", w * 1.5);
+set("z", 0); 
+set("z span", height * 3);
+# Configuração CRÍTICA: Voltar para o modo fundamental apenas
+set("mode selection", "fundamental TE");
+
+# Porta 2: Mede Transmissão TE0 (Through)
+addport;
+set("name", "port_2");
+set("injection axis", "x-axis");
+set("direction", "Backward");
+set("x", L_actual/2 + 0.5e-6);
+set("y", 0); 
+set("y span", w * 1.5);
+set("z", 0); 
+set("z span", height * 3);
+set("mode selection", "fundamental TE");
+
+# ======================================================================
+# 5. CONFIGURAÇÃO GLOBAL E DE FONTES
+# ======================================================================
+# Centralizado em 1550 nm (expandido para garantir a captura do pico)
+setglobalsource("wavelength start", 1.5e-6);
+setglobalsource("wavelength stop", 1.6e-6); 
+setglobalsource("optimize for short pulse", 0);
+
+select("FDTD");
+setnamed("FDTD::ports", "source port", "port_1");
+setnamed("FDTD::ports", "monitor frequency points", points);
+setglobalmonitor("frequency points", points);

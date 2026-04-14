@@ -1,0 +1,138 @@
+# create_guide_fdtd.lsf
+# ======================================================================
+# LIMPEZA DE ESCOPO E GEOMETRIA ANTIGA
+# ======================================================================
+groupscope("::model"); # Força o Lumerical a voltar para a raiz
+#select("Guia Bragg");  
+#delete;                # Apaga a versão velha para evitar conflitos
+
+# ======================================================================
+# SCRIPT AJUSTADO PARA O ARTIGO 2 (Chen et al. - Monomodo)
+# ======================================================================
+
+# 1. Cria o grupo do Guia e define as propriedades
+addstructuregroup;
+set("name","Guia Bragg");
+set("x", 0);
+set("y", 0);
+set("z", 0);
+
+# Parâmetros Físicos exatos do Artigo 2
+adduserprop("height", 2, 0.22e-6);         
+adduserprop("material", 5, 'Si (Silicon) - Palik');
+adduserprop("Lambda", 2, 0.304e-6);        
+adduserprop("DC", 2,  0.5);                
+adduserprop("w", 2, 0.64e-6);              
+adduserprop("delta", 2, 0.07e-6);          
+adduserprop("L_target", 2, 200e-6);        
+adduserprop("b", 2, 10);                   
+
+# Extração das variáveis
+height   = getnamed("Guia Bragg", "height");
+w        = getnamed("Guia Bragg", "w");
+delta    = getnamed("Guia Bragg", "delta");
+Lambda   = getnamed("Guia Bragg", "Lambda");
+DC       = getnamed("Guia Bragg", "DC");
+L_target = getnamed("Guia Bragg", "L_target");
+b        = getnamed("Guia Bragg", "b");
+material = getnamed("Guia Bragg", "material");
+
+# Cálculos Derivados
+w_c = w - 2*delta;                 
+N = round(L_target / Lambda);      
+L_actual = N * Lambda;             
+
+# ======================================================================
+# 2. CÁLCULO DO PERFIL 
+# ======================================================================
+delta_s_vector = matrix(N, 1);
+
+for(i=1:N) {
+    z = (i-1) * Lambda; 
+    term = (z - L_actual/2) / L_actual;
+    delta_s_vector(i) = (Lambda / 2.0) * exp(-b * (term^2));
+}
+
+# ======================================================================
+# 3. CONSTRUÇÃO DA GEOMETRIA (OTIMIZADA)
+# ======================================================================
+# DESLIGA A RENDERIZAÇÃO GRÁFICA (Acelera a construção em 100x)
+redrawoff; 
+
+groupscope("::model");
+select("Substrato - SiO2 DOWN"); delete;
+select("Substrato - SiO2 UP"); delete;
+select("core guide"); delete;
+select("Guide in"); delete;
+select("Guide out"); delete;
+selectpartial("tooth_"); delete; 
+
+groupscope("::model::Guia Bragg");
+
+# Cria substratos
+addrect;
+set("material", 'SiO2 (Glass) - Palik');
+set("name","Substrato - SiO2 DOWN");
+set("x",0); set("x span", L_actual*1.1);
+set("y", 0); set("y span", 5e-6);
+set("z", -1e-6); set("z span", 2e-6);
+
+addrect;
+set("material", 'SiO2 (Glass) - Palik');
+set("name","Substrato - SiO2 UP");
+set("x",0); set("x span", L_actual*1.1);
+set("y", 0); set("y span", 5e-6);
+set("z", 1.1e-6); set("z span", 2.2e-6);
+set("alpha", 0.4);
+
+# Guia central e portas
+addrect;
+set("name", "core guide");
+set("material", material);
+set("x", 0); set('x span', L_actual);
+set("y", 0); set('y span', w_c);
+set("z", 0); set('z span', height);
+
+addrect;
+set("name", "Guide in");
+set("material", material);
+set("x", -L_actual/2 - 2e-6); set("x span", 4e-6);
+set("y", 0); set('y span', w_c);
+set("z", 0); set('z span', height);
+   
+addrect;
+set("name", "Guide out");
+set("material", material);
+set("x", L_actual/2 + 2e-6); set("x span", 4e-6);
+set("y", 0); set('y span', w_c);
+set("z", 0); set('z span', height);
+
+# Loop de Construção dos Segmentos
+start_x = -L_actual/2 + Lambda/2; 
+
+for(i=0:N-1){
+    current_ds = delta_s_vector(i+1);
+    
+    addrect;
+    set("name", "tooth_top_" + num2str(i));
+    set("material", material);
+    set("x", start_x + (i*Lambda));
+    set('x span', Lambda*DC);
+    set("y", w_c/2 + delta/2);  
+    set('y span', delta);
+    set("z", 0);
+    set('z span', height);
+
+    addrect;
+    set("name", "tooth_bottom_" + num2str(i));
+    set("material", material);
+    set("x", start_x + (i*Lambda) + current_ds);
+    set('x span', Lambda*DC);
+    set("y", -w_c/2 - delta/2); 
+    set('y span', delta);
+    set("z", 0);
+    set('z span', height);
+}
+
+# LIGA A RENDERIZAÇÃO GRÁFICA NOVAMENTE (Atualiza a tela de uma vez)
+redrawon;
