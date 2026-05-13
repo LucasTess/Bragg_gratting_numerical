@@ -1,0 +1,183 @@
+# create_guide_fdtd.lsf
+# ======================================================================
+# LIMPEZA DE ESCOPO E GEOMETRIA ANTIGA
+# ======================================================================
+groupscope("::model");
+deleteall;
+clc;
+clear;               # Apaga a versão velha para evitar conflitos
+
+# ======================================================================
+# SCRIPT PARAMETRIZADO: TOPOLOGIA MONOMODO + GERADOR DE FOURIER
+# ======================================================================
+
+# 1. Cria o grupo do Guia e define as propriedades
+addstructuregroup;
+set("name","Guia Bragg");
+set("x", 0);
+set("y", 0);
+set("z", 0);
+
+# Parâmetros Físicos da Nossa Parametrização
+adduserprop("height", 2, 0.22e-6);         
+adduserprop("material", 5, 'Si (Silicon) - Palik');
+adduserprop("Lambda", 2, 0.304e-6);        
+adduserprop("DC", 2,  0.5);                
+adduserprop("w", 2, 0.64e-6);              
+adduserprop("w_c", 2, 0.50e-6);            
+adduserprop("N", 2, 658);
+# N de calibração                  
+#adduserprop("N", 2, 100);
+# Genes do Gerador de Fourier (Seu Algoritmo)
+adduserprop("H", 2, 1);                    
+adduserprop("alpha_param", 2, 1);          
+adduserprop("beta", 2, 1.57);              
+adduserprop("S", 2, 0);                    # 0 = contínuo, S>1 = discretizado (degraus)
+
+# Extração das variáveis
+height      = getnamed("Guia Bragg", "height");
+w           = getnamed("Guia Bragg", "w");
+w_c         = getnamed("Guia Bragg", "w_c");
+Lambda      = getnamed("Guia Bragg", "Lambda");
+DC          = getnamed("Guia Bragg", "DC");
+N           = getnamed("Guia Bragg", "N");
+material    = getnamed("Guia Bragg", "material");
+
+H           = round(getnamed("Guia Bragg", "H"));
+alpha_param = getnamed("Guia Bragg", "alpha_param");
+beta        = getnamed("Guia Bragg", "beta");
+S           = round(getnamed("Guia Bragg", "S"));
+
+# Cálculos Derivados (Física Geométrica)
+delta = (w - w_c) / 2;             # Calcula a largura da corrugação (dente)    
+L_actual = N * Lambda;             # Comprimento total exato
+
+# ======================================================================
+# 2. CÁLCULO DO PERFIL (Gerador Espectral de Fourier)
+# ======================================================================
+ds_max = Lambda * DC;              # Deslocamento lateral máximo (100% da corrugação)
+y_raw = matrix(N, 1);
+delta_s_vector = matrix(N, 1);
+
+# Passo A: Soma da Série de Fourier
+for(n=1:N) {
+    x = (2.0 * n - N) / N;         # Normaliza a posição x entre -1 e 1
+    sum_val = 0;
+    
+    for(k=1:H) {
+        Ak = sin(k * beta) / (k^alpha_param);
+        sum_val = sum_val + Ak * cos(k * pi * x / 2.0);
+    }
+    y_raw(n) = sum_val;
+}
+
+# Passo B: Normalização Min-Max para o intervalo [0, 1]
+y_min = min(y_raw);
+y_max = max(y_raw);
+
+for(n=1:N) {
+    if (y_max > y_min) {
+        val_norm = (y_raw(n) - y_min) / (y_max - y_min);
+    } else {
+        val_norm = 1; 
+    }
+    
+    # Passo C: Discretização de Manufatura (Degraus)
+    if (S > 1) {
+        levels = S - 1;
+        val_norm = round(val_norm * levels) / levels;
+    }
+    
+    # Passo D: Escalonamento final para nanômetros 
+    delta_s_vector(n) = (1-val_norm) * ds_max;
+    # 0 para calibração
+    #delta_s_vector(n) = 0;
+}
+
+# ======================================================================
+# 3. CONSTRUÇÃO DA GEOMETRIA (OTIMIZADA)
+# ======================================================================
+redrawoff; 
+
+groupscope("::model");
+select("Substrato - SiO2 DOWN"); delete;
+select("Substrato - SiO2 UP"); delete;
+select("core guide"); delete;
+select("Guide in"); delete;
+select("Guide out"); delete;
+selectpartial("tooth_"); delete; 
+
+groupscope("::model::Guia Bragg");
+
+# Cria substratos
+addrect;
+set("material", 'SiO2 (Glass) - Palik');
+set("name","Substrato - SiO2 DOWN");
+set("x",0); set("x span", (L_actual+2*Lambda)*1.1);
+set("y", 0); set("y span", 5e-6);
+set("z", -1e-6); set("z span", 2e-6);
+
+addrect;
+set("material", 'SiO2 (Glass) - Palik');
+set("name","Substrato - SiO2 UP");
+set("x",0); set("x span", (L_actual+2*Lambda)*1.1);
+set("y", 0); set("y span", 5e-6);
+set("z", 1.1e-6); set("z span", 2.2e-6);
+set("alpha", 0.4);
+
+# Guia central e portas (Estritamente Monomodo = w_c)
+addrect;
+set("name", "core guide");
+set("material", material);
+set("x", 0); set('x span', L_actual);
+set("y", 0); set('y span', w_c);
+set("z", 0); set('z span', height);
+
+addrect;
+set("name", "Guide in");
+set("material", material);
+#set("x", -L_actual/2-Lambda); 
+#set("x span", 2*Lambda);
+set("x min", -(L_actual+2*Lambda)*1.1/2);
+set("x max", -L_actual/2);
+set("y", 0); set('y span', w_c);
+set("z", 0); set('z span', height);
+   
+addrect;
+set("name", "Guide out");
+set("material", material);
+#set("x", L_actual/2 + Lambda); 
+#set("x span", 2*Lambda);
+set("x min", L_actual/2);
+set("x max", (L_actual+2*Lambda)*1.1/2);
+set("y", 0); set('y span', w_c);
+set("z", 0); set('z span', height);
+
+# Loop de Construção dos Segmentos (CORRIGIDO PARA SIMETRIA CLMM)
+start_x = -L_actual/2 + Lambda/2; 
+
+for(i=0:N-1){
+    current_ds = delta_s_vector(i+1);
+    
+    addrect;
+    set("name", "tooth_top_" + num2str(i));
+    set("material", material);
+    # Desloca SIMETRICAMENTE para a esquerda
+    set("x", start_x + (i*Lambda) - (current_ds / 2));
+    set('x span', Lambda*DC);
+    set("y", w_c/2 + delta/2);  
+    set('y span', delta);
+    set("z", 0);
+    set('z span', height);
+
+    addrect;
+    set("name", "tooth_bottom_" + num2str(i));
+    set("material", material);
+    # Desloca SIMETRICAMENTE para a direita
+    set("x", start_x + (i*Lambda) + (current_ds / 2));
+    set('x span', Lambda*DC);
+    set("y", -w_c/2 - delta/2); 
+    set('y span', delta);
+    set("z", 0);
+    set('z span', height);
+}

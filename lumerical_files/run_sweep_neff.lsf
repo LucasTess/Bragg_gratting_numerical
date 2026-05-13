@@ -1,0 +1,33 @@
+w_start = 400e-9;
+w_stop  = 800e-9;
+pontos  = 41; 
+w_vetor = linspace(w_start, w_stop, pontos);
+
+neff_vetor = matrix(pontos, 1);
+ng_vetor   = matrix(pontos, 1);
+
+setanalysis("calculate group index", 1);
+setanalysis("wavelength", 1541.5e-9);
+
+? "Iniciando varredura geométrica...";
+
+for (i = 1:pontos) {
+    switchtolayout;
+    
+    # CORREÇÃO: Altera a largura no Eixo Y!
+    setnamed("core", "y span", w_vetor(i)); 
+
+    findmodes;
+    
+    # Extrai Neff e Ng
+    neff_vetor(i) = real(getdata("mode1", "neff"));
+    ng_vetor(i)   = real(getdata("mode1", "ng"));
+    
+    ? "Calculado -> W = " + num2str(w_vetor(i)*1e9) + " nm | Neff = " + num2str(neff_vetor(i));
+}
+
+dados_finais = [w_vetor*1e9, neff_vetor, ng_vetor]; 
+rm("tabela_dispersao_soi.txt");
+write("tabela_dispersao_soi.txt", "Largura(nm)    Neff    Ng");
+write("tabela_dispersao_soi.txt", num2str(dados_finais));
+? "Sucesso! Tabela gerada.";

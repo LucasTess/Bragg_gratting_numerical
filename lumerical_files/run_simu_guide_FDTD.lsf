@@ -7,61 +7,60 @@ select("mesh_grating"); # Limpa a malha customizada anterior, se existir
 delete;
 
 # ======================================================================
-# 1. OBTENÇÃO DOS PARÂMETROS DA GEOMETRIA
+# 1. OBTENÇÃO DOS PARÂMETROS DA GEOMETRIA (ATUALIZADO)
 # ======================================================================
 height   = getnamed("Guia Bragg", "height");
 Lambda   = getnamed("Guia Bragg", "Lambda");
 w        = getnamed("Guia Bragg", "w");
-L_target = getnamed("Guia Bragg", "L_target");
+N        = getnamed("Guia Bragg", "N"); # Agora puxamos N diretamente!
 
-# Recalculando dimensões reais baseadas na geometria do script anterior
-N = round(L_target / Lambda);
+# O comprimento real da grade agora é consequência direta do seu algoritmo
 L_actual = N * Lambda;
 
-sim_time = 10000e-15; # 10 ps: Tempo para a luz percorrer os 200 um (ida e volta)
+sim_time = 10000e-15; # 10 ps: Tempo para a luz percorrer o guia (ida e volta)
 points = 500;
-mesh_accuracy = 2; # A precisão base pode ficar em 2, pois teremos a malha forçada na grade
+mesh_accuracy = 2; 
 
 # ======================================================================
 # 2. CONFIGURAÇÃO DA REGIÃO FDTD (3D)
 # ======================================================================
 addfdtd;
 set("dimension", "3D"); 
-set("x min", -L_actual/2 - 1.5e-6);
-set("x max", L_actual/2 + 1.5e-6);
+set("x",0); set("x span", (L_actual+2*Lambda)*1.05);
 set("y", 0);
 set("y span", w + 2e-6); 
 set("z", 0);
 set("z span", height + 1.5e-6);
-
+set("simulation time", sim_time);
 set("background material", 'SiO2 (Glass) - Palik');
 set("mesh accuracy", mesh_accuracy);
+set("use early shutoff", 1);
 set("auto shutoff min", 1e-5); 
 
 # ======================================================================
 # 3. MALHA DE PRECISÃO (CRÍTICO PARA LER A APODIZAÇÃO)
 # ======================================================================
 # Força resolução de 10nm na região da grade para não perder os dentes
-addmesh;
-set("name", "mesh_grating");
-set("x", 0); 
-set("x span", L_actual);
-set("y", 0); 
-set("y span", w * 1.2);
-set("z", 0); 
-set("z span", height * 1.5);
-set("dx", 10e-9); 
-set("dy", 10e-9);
+#addmesh;
+#set("name", "mesh_grating");
+#set("x", 0); 
+#set("x span", L_actual);
+#set("y", 0); 
+#set("y span", w * 1.2);
+#set("z", 0); 
+#set("z span", height * 1.5);
+#set("dx", 10e-9); 
+#set("dy", 10e-9);
 
 # ======================================================================
-# 4. CONFIGURAÇÃO DE PORTAS (REGIME ESTREITAMENTE MONOMODO)
+# 4. CONFIGURAÇÃO DE PORTAS (REGIME ESTRITAMENTE MONOMODO)
 # ======================================================================
 # Porta 1: Injeta TE0 e Mede Reflexão TE0
 addport;
 set("name", "port_1");
 set("injection axis", "x-axis");
 set("direction", "Forward");
-set("x", -L_actual/2 - 0.5e-6);
+set("x", -L_actual/2 - 2*Lambda);
 set("y", 0); 
 set("y span", w * 1.5);
 set("z", 0); 
@@ -74,7 +73,7 @@ addport;
 set("name", "port_2");
 set("injection axis", "x-axis");
 set("direction", "Backward");
-set("x", L_actual/2 + 0.5e-6);
+set("x", L_actual/2 + 2*Lambda);
 set("y", 0); 
 set("y span", w * 1.5);
 set("z", 0); 

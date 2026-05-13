@@ -1,0 +1,30 @@
+# create_fde_neff.lsf
+# ======================================================================
+# SCRIPT PARA EXTRAÇÃO DE NEFF (LUMERICAL MODE - FDE)
+# ======================================================================
+
+deleteall;
+
+# 1. Parâmetros Físicos (Artigo 2)
+w_inicial = 0.50e-6;   # Largura do núcleo Wg1 (500nm)
+height = 0.22e-6;           # Espessura do Silício (220nm)
+material_si = "Si (Silicon) - Palik";
+material_cladding = "SiO2 (Glass) - Palik";
+lambda_sim = 1541.5e-9; # Usando o pico real validado anteriormente
+
+# Geometria com eixos orientados para casar com o seu FDTD
+addrect;
+set("name","core");
+set("material", material_si);
+set("x", 0); set("x span", 10e-6);       # Comprimento longo (Propagação)
+set("y", 0); set("y span", w_inicial);   # LARGURA (Eixo Y)
+set("z", 0); set("z span", height);           # ALTURA (Eixo Z - 220nm)
+
+# 3. Solver FDE (Seção Transversal)
+addfde;
+set("solver type", "2D X normal"); 
+set("y", 0); set("y span", 3.0e-6); 
+set("z", 0); set("z span", 2.0e-6);
+set("background material", material_cladding);
+
+setanalysis("wavelength", lambda_sim);
