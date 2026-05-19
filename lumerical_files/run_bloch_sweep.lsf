@@ -1,0 +1,66 @@
+# ======================================================================
+# run_bloch_sweep_high_acc.lsf
+# EXTRATOR DE n_bloch E kappa_3D COM ALTA RESOLUÇÃO
+# ======================================================================
+
+Lambda = 304e-9;
+ng_estimado = 4.0; 
+c = 299792458;
+
+w_start = 500e-9;
+w_stop  = 800e-9;
+pontos  = 16; 
+w_vetor = linspace(w_start, w_stop, pontos);
+
+n_bloch_vetor = matrix(pontos, 1);
+kappa_vetor   = matrix(pontos, 1);
+
+? "Iniciando Varredura de Estrutura de Bandas de Alta Precisão...";
+
+for(i=1:pontos){
+    switchtolayout;
+    setnamed("corrugation", "y span", w_vetor(i));
+    
+    ? "Simulando W = " + num2str(w_vetor(i)*1e9) + " nm...";
+    run;
+    
+    t = getdata("time_monitor", "t");
+    Ey_raw = getdata("time_monitor", "Ey"); 
+    Ey = pinch(Ey_raw); 
+    
+    # Aumentando os pontos de avaliação espectral para extrair o pico exato
+    f = linspace(180e12, 210e12, 20000); 
+    espectro = abs(czt(Ey, t, 2*pi*f))^2;
+    
+    # Opcional: Se a versão do seu Lumerical suportar, Harminv extrai ressonâncias com precisão sub-mesh
+    # peaks = findresonances(t, Ey); 
+    
+    peaks = findpeaks(espectro, 2); 
+    f1 = f(peaks(1));
+    f2 = f(peaks(2));
+    
+    lambda_1 = c / f1;
+    lambda_2 = c / f2;
+    
+    lambda_B = (lambda_1 + lambda_2) / 2;
+    delta_lambda = abs(lambda_1 - lambda_2);
+    
+    n_bloch_vetor(i) = lambda_B / (2 * Lambda);
+    
+    # Prevenção numérica para o caso W = W_c (onde delta_lambda deveria ser 0)
+    if (w_vetor(i) == 500e-9) {
+        kappa_vetor(i) = 0;
+    } else {
+        kappa_vetor(i) = (pi * ng_estimado * delta_lambda) / (lambda_B^2);
+    }
+    
+    ? "-> n_bloch = " + num2str(n_bloch_vetor(i)) + " | kappa = " + num2str(kappa_vetor(i)/1000) + " mm^-1";
+}
+
+dados_finais = [w_vetor*1e9, n_bloch_vetor, kappa_vetor];
+rm("tabela_3D_bloch_rigorosa.txt");
+write("tabela_3D_bloch_rigorosa.txt", "Largura(nm)    n_bloch    kappa_3D(m^-1)");
+write("tabela_3D_bloch_rigorosa.txt", num2str(dados_finais));
+
+? "=========================================================";
+? "Tabela Rigorosa gerada com sucesso!";

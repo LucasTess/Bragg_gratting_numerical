@@ -1,0 +1,70 @@
+# ======================================================================
+# setup_bloch_cell_high_acc.lsf
+# CONSTRUTOR DE BLOCH (ALTA RESOLUÇÃO ESPACIAL E TEMPORAL)
+# ======================================================================
+deleteall;
+groupscope("::model");
+
+Lambda = 304e-9;
+W_c    = 500e-9;
+W      = 640e-9; 
+H      = 220e-9;
+DC     = 0.5;
+
+material_si = "Si (Silicon) - Palik";
+material_cladding = "SiO2 (Glass) - Palik";
+
+# Geometria
+addrect; set("name","core");
+set("material", material_si);
+set("x", 0); set("x span", Lambda);
+set("y", 0); set("y span", W_c);
+set("z", 0); set("z span", H);
+
+addrect; set("name","corrugation");
+set("material", material_si);
+set("x", 0); set("x span", Lambda * DC);
+set("y", 0); set("y span", W);
+set("z", 0); set("z span", H);
+
+# Solver FDTD
+addfdtd;
+set("x", 0); set("x span", Lambda);
+set("y", 0); set("y span", 1.5e-6);
+set("z", 0); set("z span", 1.0e-6);
+set("background material", material_cladding);
+set("x min bc", "Bloch");
+set("x max bc", "Bloch");
+set("z min bc", "Symmetric");
+
+set("set based on source angle", 0); 
+set("kx", pi/Lambda); 
+
+# CORREÇÃO TEMPORAL: 20.000 fs garantem resolução de FFT de ~50 GHz
+set("simulation time", 20000e-15); 
+set("use early shutoff", 0); 
+
+# CORREÇÃO ESPACIAL: Mesh Override para impedir "Erosão Dielétrica" nas quinas
+addmesh;
+set("name", "high_res_mesh");
+set("x", 0); set("x span", Lambda);
+set("y", 0); set("y span", 800e-9); # Cobre toda a variação de W
+set("z", 0); set("z span", H);
+set("dx", 2e-9); # Resolução transversal de 2 nm
+set("dy", 2e-9); # Resolução transversal de 2 nm
+set("dz", 10e-9); # O eixo Z afeta menos o espalhamento transversal
+
+# Fontes (Modo TE)
+adddipole; set("name", "dipole_1");
+set("x", 0); set("y", W_c/2); set("z", 0); 
+set("theta", 90); set("phi", 90); 
+
+adddipole; set("name", "dipole_2");
+set("x", Lambda/4); set("y", 0); set("z", 0); 
+set("theta", 90); set("phi", 90); 
+
+# Monitor Temporal
+addtime; set("name", "time_monitor");
+set("x", -Lambda/4); set("y", W_c/4); set("z", 0);
+
+? "Célula Unitária configurada com Alta Precisão (2nm / 20ps).";
