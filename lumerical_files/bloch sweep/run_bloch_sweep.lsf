@@ -5,7 +5,7 @@
 
 Lambda = 304e-9;
 ng_estimado = 4.0; 
-c = 299792458;
+
 
 w_start = 500e-9;
 w_stop  = 800e-9;

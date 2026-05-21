@@ -13,7 +13,7 @@ DC     = 0.5;
 
 material_si = "Si (Silicon) - Palik";
 material_cladding = "SiO2 (Glass) - Palik";
-
+mesh_accuracy = 3;
 # Geometria
 addrect; set("name","core");
 set("material", material_si);
@@ -43,16 +43,16 @@ set("kx", pi/Lambda);
 # CORREÇÃO TEMPORAL: 20.000 fs garantem resolução de FFT de ~50 GHz
 set("simulation time", 20000e-15); 
 set("use early shutoff", 0); 
-
+set("mesh accuracy", mesh_accuracy);
 # CORREÇÃO ESPACIAL: Mesh Override para impedir "Erosão Dielétrica" nas quinas
-addmesh;
-set("name", "high_res_mesh");
-set("x", 0); set("x span", Lambda);
-set("y", 0); set("y span", 800e-9); # Cobre toda a variação de W
-set("z", 0); set("z span", H);
-set("dx", 2e-9); # Resolução transversal de 2 nm
-set("dy", 2e-9); # Resolução transversal de 2 nm
-set("dz", 10e-9); # O eixo Z afeta menos o espalhamento transversal
+#addmesh;
+#set("name", "high_res_mesh");
+#set("x", 0); set("x span", Lambda);
+#set("y", 0); set("y span", 800e-9); # Cobre toda a variação de W
+#set("z", 0); set("z span", H);
+#set("dx", 2e-9); # Resolução transversal de 2 nm
+#set("dy", 2e-9); # Resolução transversal de 2 nm
+#set("dz", 10e-9); # O eixo Z afeta menos o espalhamento transversal
 
 # Fontes (Modo TE)
 adddipole; set("name", "dipole_1");
